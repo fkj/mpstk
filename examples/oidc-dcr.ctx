@@ -1,0 +1,105 @@
+### OpenID Connect with Deferred Code Response
+###
+### Participants:
+### - "End-User" (eu) is the human participant being asked to identify themselves
+### - "OpenID Provider" (op) is the Authorization Server capable of authenticating the end user
+### - "Fast Validator" (fv) is a system capable of quickly validating identity credentials,
+      but which may sometimes give up and respond that it is incapable of validating a credential
+### - "Slow Validator" (sv) is a system capable of validating identity credentials with
+###   (legally) perfect accuracy, but with unbounded response time
+### - "Relying Party" (rp) is the application requiring authentication of the end user
+###
+### The goal of the protocol is for the End-User to identify themselves to the Relying Party
+### using an existing physical credential such as a driver's license or a passport.
+### The Relying Party has outsourced the identification process to an OpenID Provider.
+### The OpenID Provider operates a system which can validate physical credentials.
+###
+### Unlike in standard OpenID Connect, the validation system is not assumed to be synchronous.
+### Instead, the validation system of the OpenID Provider consists of two subsystem:
+###  1. A Fast Validator, which can in most cases quickly validate a credential, but which
+###     may sometimes give up and declare that it cannot validate the credential.
+###  2. A Slow Validator, which can always validate credentials, but which may take very long
+###     to provide a response.
+### Such a validation system may for instance be implemented by:
+###  1. A Fast Validator based on machine learning which may sometimes be unable to validate
+###     a credential.
+###  2. A Slow Validator controlled by a human operator who can physically or digitally validate
+###     the identity of an End-User in the cases where the fast validator fails.
+### This architecture is often called a "human-on-the-loop" system.
+### The procedure by which the Fast and Slow Validators validate the credential are not material
+### to the protocol, and neither is the success rate of the Fast Validator.
+### In particular, both Validators may consist of several procedures to be attempted sequentially.
+### Note that the protocol also works in the special case where the Fast Validator always fails,
+### in which case the Fast Validator can be removed from the system.
+###
+### The material property of the Fast Validator is that it is fast enough to use existing techniques
+### such as redirects or short "loading" screens that require the End-User Agent to await its
+### completion within the same session.
+### In contrast, the Slow Validator is so slow that it is unreasonable to require the End-User Agent
+### to maintain a session with the OpenID Provider and Relying Party.
+### The End-User Agent may for instance lose connectivity to the internet or turn off while awaiting
+### processing by the Slow Validator.
+###
+### An example application of this protocol is in vehicle rental.
+### In this application, the End-User wants to rent a car from an online rental service.
+### To do so, the rental service must validate that the End-User has a driver's license, and
+### thus plays the role of Relying Party.
+### The rental service outsources the validation of driver's licenses to a third-party service,
+### the OpenID Provider.
+### This OpenID Provider has designed a system which allows the End-User to validate their
+### driver's license by presenting pictures of the physical driver's license and of themselves.
+### These pictures are first passed to a machine learning system which attempts to validate the
+### authenticity of the driver's license and match the facial features of the End-User with those
+### in the photo on the driver's license.
+### This process will complete within at most a few minutes, and can thus be awaited while keeping
+### the End-User Agent in the original session.
+### The machine learning system may be unable to validate the authenticity of the driver's license
+### and/or unable to match the facial features of the End-User with those in the photo.
+### In such cases, the system defers to an alternative process in which a human operator manually
+### confirms the authenticity of the driver's license and the match with the End-User.
+### Since this process requires a human operator, it may take many days to complete.
+### This is non-material to the rental service as long as the process completes before the day on
+### which the rental agreement commences, but the long processing time makes it unreasonable to
+### require the End-User Agent to maintain a session with the OpenID Provider or the Relying Party
+### throughout.
+### Overview of the flow:
+###  1. The End-User initiates a rental order with the Relying Party
+###  2. The Relying Party redirects the End-User to the OpenID Provider Authorization Endpoint for
+        validation of the End-User's driver's license
+###  3. The OpenID Provider asks the End-User for pictures of their driver's license and themselves
+###  4. The End-User sends pictures of their driver's license and themselves to the OpenID Provider
+###  5. The OpenID Provider sends the pictures to the Fast Validator to attempt validation
+###  6a. If the Fast Validator succeeds:
+###     7a. The Fast Validator sends an affirmative message to the OpenID Provider
+###     8a. The OpenID Provider redirects the End-User to the Relying Party with an Authorization Code
+###     9a. The Relying Party sends the Authorization Code to the OpenID Provider Token Endpoint
+###    10a. The OpenID Provider sends an ID Token containing Claims about the End-User to the Relying Party
+###    11a. The Relying Party notifies the End-User that their driver's license has been validated
+###  6b. If the Fast Validator fails:
+
+
+s[auth]:
+	client&{
+		passwd(string).server⊕{
+			auth(bool).end
+		},
+		quit(end).end
+	},
+	
+s[server]:
+	client⊕{
+		login(end).auth&{
+			auth(bool).end
+		},
+		cancel(end).end
+	},
+	
+s[client]:
+	server&{
+		login(end).auth⊕{
+			passwd(string).end
+		},
+		cancel(end).auth⊕{
+			quit(end).end
+		}
+	}
